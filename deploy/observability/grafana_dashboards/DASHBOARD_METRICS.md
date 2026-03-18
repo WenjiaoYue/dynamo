@@ -272,6 +272,9 @@ Launch the XPU-SMI Prometheus exporter before starting the observability stack:
 ```bash
 # Install Intel XPU-SMI (xpumanager): https://github.com/intel/xpumanager
 xpu-smi dump --target prometheus -p 9966 &
+
+# Start the full XPU observability stack
+docker compose -f deploy/docker-observability-xpu.yml up -d
 ```
 
 ### XPU-SMI Dashboard Panels (`xpu-smi-metrics.json`)
