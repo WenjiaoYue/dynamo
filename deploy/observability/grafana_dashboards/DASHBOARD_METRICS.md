@@ -271,7 +271,8 @@ These metrics come from the Intel XPU-SMI Prometheus exporter (`xpu-smi-exporter
 Launch the XPU-SMI Prometheus exporter before starting the observability stack:
 ```bash
 # Install Intel XPU-SMI (xpumanager): https://github.com/intel/xpumanager
-xpu-smi dump --target prometheus -p 9966 &
+# Start the exporter (serves Prometheus metrics on port 9966)
+python deploy/observability/xpu_smi_exporter.py --port 9966 &
 ```
 
 ### XPU-SMI Dashboard Panels (`xpu-smi-metrics.json`)
