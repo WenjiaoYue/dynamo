@@ -55,6 +55,18 @@ scrape_configs:
     static_configs:
       - targets: ['host.docker.internal:6880']
 
+  # Intel XPU-SMI metrics exporter (Intel GPU monitoring)
+  # Launch via: xpu-smi dump --target prometheus -p 9966
+  # See: https://github.com/intel/xpumanager
+  - job_name: 'xpu-smi-exporter'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['host.docker.internal:9966']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'xpu-host'
+
   # Uncomment to see its own Prometheus metrics
   # - job_name: 'prometheus'
   #   scrape_interval: 5s
