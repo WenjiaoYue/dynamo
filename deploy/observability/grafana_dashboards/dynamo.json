@@ -804,19 +804,6 @@
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
-          "editorMode": "code",
-          "expr": "",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "B"
         }
       ],
       "title": "dynamo.vllm requests / sec",
@@ -1022,5 +1009,5 @@
   "timezone": "browser",
   "title": "Dynamo Dashboard (generic)",
   "uid": "97ae8df9-138a-4f7a-9b0f-635b77d818fe",
-  "version": 1
+  "version": 2
 }
