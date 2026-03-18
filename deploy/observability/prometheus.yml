@@ -55,6 +55,16 @@ scrape_configs:
     static_configs:
       - targets: ['host.docker.internal:6880']
 
+  # NIXL telemetry metrics (transfer layer for disaggregated prefill/decode)
+  # NIXL exposes metrics on a separate port from Dynamo component metrics.
+  # Enable NIXL telemetry: set NIXL_TELEMETRY_ENABLE=y before launching disaggregated workers.
+  # See: https://github.com/ai-dynamo/nixl/blob/main/docs/telemetry.md
+  # Uncomment to scrape NIXL metrics:
+  # - job_name: 'nixl-telemetry'
+  #   scrape_interval: 5s
+  #   static_configs:
+  #     - targets: ['host.docker.internal:19090']
+
   # Uncomment to see its own Prometheus metrics
   # - job_name: 'prometheus'
   #   scrape_interval: 5s
