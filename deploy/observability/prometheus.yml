@@ -17,6 +17,9 @@ global:
   scrape_interval: 10s
   evaluation_interval: 10s
 
+rule_files:
+  - "xpu-alert-rules.yml"
+
 scrape_configs:
   - job_name: 'nats-prometheus-exporter'
     scrape_interval: 2s
@@ -33,31 +36,21 @@ scrape_configs:
     static_configs:
       - targets: ['dcgm-exporter:9401']  # on the "monitoring" network
 
-  # This is a demo service that needs to be launched manually
-  # Note that you may need to disable the firewall on your host. On Ubuntu: sudo ufw allow 8000/tcp
-  # You can also force the port, if the default is different: python -m dynamo.frontend --http-port 8000
   - job_name: 'dynamo-frontend'
     scrape_interval: 10s
     static_configs:
       - targets: ['host.docker.internal:8000']  # on the "monitoring" network
 
-  # Launch via: DYN_SYSTEM_PORT=8081 dynamo.<backend> ...
-  # If you want to update the scrape_interval, you may want to also update component.rs's MAX_DELAY
   - job_name: 'dynamo-backend'
     scrape_interval: 6s
     static_configs:
       - targets: ['host.docker.internal:8081']
 
-
-  # KVBM leader related metrics
   - job_name: 'kvbm-metrics'
     scrape_interval: 2s
     static_configs:
       - targets: ['host.docker.internal:6880']
 
-  # Intel XPU-SMI metrics exporter (Intel GPU monitoring)
-  # Launch via: xpu-smi dump --target prometheus -p 9966
-  # See: https://github.com/intel/xpumanager
   - job_name: 'xpu-smi-exporter'
     scrape_interval: 5s
     static_configs:
