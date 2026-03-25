@@ -16,7 +16,7 @@ Metrics exposed (matching the Grafana dashboard xpu-smi-metrics.json):
     xpu_memory_used_bytes        - GPU memory used in bytes
     xpu_memory_free_bytes        - GPU memory free in bytes
     xpu_memory_utilization_ratio - GPU memory utilization (0-1)
-    xpu_temperature_celsius      - GPU temperature (from dump metric 3)
+    xpu_temperature_celsius      - GPU temperature in Celsius (location="gpu" or location="memory")
     xpu_pcie_read_bytes_total    - PCIe read throughput (counter, bytes)
     xpu_pcie_write_bytes_total   - PCIe write throughput (counter, bytes)
     xpu_engine_group_compute_engine_util - Compute engine utilization %
@@ -30,6 +30,7 @@ import argparse
 import json
 import logging
 import subprocess
+import sys
 import threading
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -47,30 +48,25 @@ logger = logging.getLogger("xpu-smi-exporter")
 # 31=ComputeEngGrp%, 32=RenderEngGrp%, 33=MediaEngGrp%, 34=CopyEngGrp%
 DUMP_METRICS = "0,1,2,3,4,5,6,7,18,19,20,31,32,33,34"
 
-# Metric name in dump header -> (prometheus_name, help, type, unit_conversion)
+# Metric name in dump header -> (prometheus_name, help, type, unit_conversion, location)
 # unit_conversion: multiply raw value by this factor
+# location: optional label value for the "location" label (temperature metrics only)
 DUMP_HEADER_MAP = {
-    "GPU Utilization (%)": ("xpu_gpu_utilization_percent", "GPU utilization percentage", "gauge", 1),
-    "GPU Power (W)": ("xpu_power_watts", "GPU power consumption in watts", "gauge", 1),
-    "GPU Frequency (MHz)": ("xpu_frequency_mhz", "GPU core frequency in MHz", "gauge", 1),
-    "GPU Core Temperature (Celsius Degree)": ("xpu_temperature_celsius", "GPU core temperature in Celsius", "gauge", 1),
-    "GPU Memory Temperature (Celsius Degree)": ("xpu_memory_temperature_celsius", "GPU memory temperature in Celsius", "gauge", 1),
-    "GPU Memory Utilization (%)": ("xpu_memory_utilization_percent", "GPU memory utilization percentage", "gauge", 1),
-    "GPU Memory Read (kB/s)": ("xpu_memory_read_bytes_total", "GPU memory read throughput in bytes per second", "gauge", 1024),
-    "GPU Memory Write (kB/s)": ("xpu_memory_write_bytes_total", "GPU memory write throughput in bytes per second", "gauge", 1024),
-    "GPU Memory Used (MiB)": ("xpu_memory_used_bytes", "GPU memory used in bytes", "gauge", 1048576),
-    "PCIe Read (kB/s)": ("xpu_pcie_read_bytes_total", "PCIe read throughput in bytes per second", "gauge", 1024),
-    "PCIe Write (kB/s)": ("xpu_pcie_write_bytes_total", "PCIe write throughput in bytes per second", "gauge", 1024),
-    "Compute engine group utilization (%)": ("xpu_engine_group_compute_engine_util", "Compute engine group utilization percentage", "gauge", 1),
-    "Render engine group utilization (%)": ("xpu_engine_group_render_engine_util", "Render engine group utilization percentage", "gauge", 1),
-    "Media engine group utilization (%)": ("xpu_engine_group_media_engine_util", "Media engine group utilization percentage", "gauge", 1),
-    "Copy engine group utilization (%)": ("xpu_engine_group_copy_engine_util", "Copy engine group utilization percentage", "gauge", 1),
-}
-
-# Location labels for temperature metrics
-TEMP_LOCATION = {
-    "xpu_temperature_celsius": "gpu",
-    "xpu_memory_temperature_celsius": "memory",
+    "GPU Utilization (%)": ("xpu_gpu_utilization_percent", "GPU utilization percentage", "gauge", 1, None),
+    "GPU Power (W)": ("xpu_power_watts", "GPU power consumption in watts", "gauge", 1, None),
+    "GPU Frequency (MHz)": ("xpu_frequency_mhz", "GPU core frequency in MHz", "gauge", 1, None),
+    "GPU Core Temperature (Celsius Degree)": ("xpu_temperature_celsius", "GPU core temperature in Celsius", "gauge", 1, "gpu"),
+    "GPU Memory Temperature (Celsius Degree)": ("xpu_temperature_celsius", "GPU memory temperature in Celsius", "gauge", 1, "memory"),
+    "GPU Memory Utilization (%)": ("xpu_memory_utilization_percent", "GPU memory utilization percentage", "gauge", 1, None),
+    "GPU Memory Read (kB/s)": ("xpu_memory_read_bytes_total", "GPU memory read throughput in bytes per second", "gauge", 1024, None),
+    "GPU Memory Write (kB/s)": ("xpu_memory_write_bytes_total", "GPU memory write throughput in bytes per second", "gauge", 1024, None),
+    "GPU Memory Used (MiB)": ("xpu_memory_used_bytes", "GPU memory used in bytes", "gauge", 1048576, None),
+    "PCIe Read (kB/s)": ("xpu_pcie_read_bytes_total", "PCIe read throughput in bytes per second", "gauge", 1024, None),
+    "PCIe Write (kB/s)": ("xpu_pcie_write_bytes_total", "PCIe write throughput in bytes per second", "gauge", 1024, None),
+    "Compute engine group utilization (%)": ("xpu_engine_group_compute_engine_util", "Compute engine group utilization percentage", "gauge", 1, None),
+    "Render engine group utilization (%)": ("xpu_engine_group_render_engine_util", "Render engine group utilization percentage", "gauge", 1, None),
+    "Media engine group utilization (%)": ("xpu_engine_group_media_engine_util", "Media engine group utilization percentage", "gauge", 1, None),
+    "Copy engine group utilization (%)": ("xpu_engine_group_copy_engine_util", "Copy engine group utilization percentage", "gauge", 1, None),
 }
 
 
@@ -156,13 +152,18 @@ class MetricsCollector:
                 if not mapping:
                     continue
 
-                prom_name, help_text, metric_type, conversion = mapping
+                prom_name, help_text, metric_type, conversion, location = mapping
                 try:
                     val = float(raw_val) * conversion
                     labels = {"device_id": str(device_id)}
-                    if prom_name in TEMP_LOCATION:
-                        labels["location"] = TEMP_LOCATION[prom_name]
-                    metrics[prom_name] = {
+                    if location is not None:
+                        labels["location"] = location
+                    # Use a unique key to avoid overwriting when two headers map to
+                    # the same prometheus metric name (e.g. both temperature entries
+                    # map to xpu_temperature_celsius but differ by location label).
+                    metric_key = prom_name if location is None else f"{prom_name}_{location}"
+                    metrics[metric_key] = {
+                        "prom_name": prom_name,
                         "value": val,
                         "help": help_text,
                         "type": metric_type,
@@ -301,17 +302,22 @@ class MetricsCollector:
             metrics = self._metrics.copy()
 
         lines = []
-        for metric_name, entries in sorted(metrics.items()):
+        # Group by prometheus metric name to emit # HELP / # TYPE once per metric
+        seen_prom_names = set()
+        for metric_key, entries in sorted(metrics.items()):
             if not entries:
                 continue
             first = entries[0]
-            lines.append(f"# HELP {metric_name} {first['help']}")
-            lines.append(f"# TYPE {metric_name} {first['type']}")
+            prom_name = first.get("prom_name", metric_key)
+            if prom_name not in seen_prom_names:
+                lines.append(f"# HELP {prom_name} {first['help']}")
+                lines.append(f"# TYPE {prom_name} {first['type']}")
+                seen_prom_names.add(prom_name)
             for entry in entries:
                 label_parts = ",".join(
                     f'{k}="{v}"' for k, v in sorted(entry["labels"].items())
                 )
-                lines.append(f"{metric_name}{{{label_parts}}} {entry['value']}")
+                lines.append(f"{prom_name}{{{label_parts}}} {entry['value']}")
         lines.append("")
         return "\n".join(lines)
 
@@ -362,7 +368,7 @@ def main():
     collector = MetricsCollector(interval=args.interval)
     if not collector._devices:
         logger.error("No XPU devices found. Exiting.")
-        return
+        sys.exit(1)
 
     # Do an initial collection to verify it works
     collector.collect()

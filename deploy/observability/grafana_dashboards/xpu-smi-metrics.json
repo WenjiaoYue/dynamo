@@ -829,7 +829,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg(xpu_engine_group_compute_engine_util)",
+          "expr": "avg(xpu_engine_group_compute_engine_util{device_id=~\"$device_id\"})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -896,7 +896,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max(xpu_temperature_celsius{location=\"gpu\"})",
+          "expr": "max(xpu_temperature_celsius{location=\"gpu\", device_id=~\"$device_id\"})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
