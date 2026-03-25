@@ -17,6 +17,10 @@ global:
   scrape_interval: 10s
   evaluation_interval: 10s
 
+# Uncomment below to enable XPU alert rules (Intel GPU hosts only):
+# rule_files:
+#   - "/etc/prometheus/xpu-alert-rules.yml"
+
 scrape_configs:
   - job_name: 'nats-prometheus-exporter'
     scrape_interval: 2s
@@ -28,10 +32,13 @@ scrape_configs:
     static_configs:
       - targets: ['etcd-server:2379']  # etcd-server is on the "monitoring" network
 
-  - job_name: 'dcgm-exporter'
-    scrape_interval: 5s
-    static_configs:
-      - targets: ['dcgm-exporter:9401']  # on the "monitoring" network
+  # dcgm-exporter is only active when running with the NVIDIA profile:
+  #   docker compose --profile nvidia -f deploy/docker-observability.yml up -d
+  # Uncomment the job below when running with the NVIDIA profile:
+  # - job_name: 'dcgm-exporter'
+  #   scrape_interval: 5s
+  #   static_configs:
+  #     - targets: ['dcgm-exporter:9401']  # on the "monitoring" network
 
   # This is a demo service that needs to be launched manually
   # Note that you may need to disable the firewall on your host. On Ubuntu: sudo ufw allow 8000/tcp
@@ -60,3 +67,15 @@ scrape_configs:
   #   scrape_interval: 5s
   #   static_configs:
   #     - targets: ['prometheus:9090']  # on the "monitoring" network
+
+  # Uncomment below to enable XPU-SMI metrics scraping (Intel GPU hosts only).
+  # Start the exporter first: python deploy/observability/xpu_smi_exporter.py --port 9966
+  # - job_name: 'xpu-smi-exporter'
+  #   scrape_interval: 5s
+  #   scrape_timeout: 5s
+  #   static_configs:
+  #     - targets: ['host.docker.internal:9966']
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: instance
+  #       replacement: 'xpu-host'
