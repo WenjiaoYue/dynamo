@@ -39,6 +39,7 @@ from dynamo.profiler.utils.aiperf import (
 from dynamo.profiler.utils.config_modifiers import CONFIG_MODIFIERS
 from dynamo.profiler.utils.config_modifiers.protocol import apply_dgd_overrides
 from dynamo.profiler.utils.dgdr_v1beta1_types import (
+    DeviceType,
     DynamoGraphDeploymentRequestSpec,
     ModelCacheSpec,
     ProfilingPhase,
@@ -445,8 +446,8 @@ async def run_thorough(
 
     # Propagate device_type (e.g. "xpu") into all candidate DGD configs so
     # that workers are deployed with the correct VLLM_TARGET_DEVICE env var.
-    device_type = getattr(ops, "device_type", "cuda")
-    if device_type != "cuda":
+    device_type = getattr(ops, "device_type", DeviceType.Cuda)
+    if device_type != DeviceType.Cuda:
         _modifier_cls = CONFIG_MODIFIERS.get(backend)
         if _modifier_cls and hasattr(_modifier_cls, "set_device_type"):
             for candidate in prefill_candidates:

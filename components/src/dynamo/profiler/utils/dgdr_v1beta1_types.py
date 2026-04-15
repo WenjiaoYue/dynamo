@@ -57,6 +57,11 @@ class SearchStrategy(str, Enum):
     Thorough = "thorough"
 
 
+class DeviceType(str, Enum):
+    Cuda = "cuda"
+    Xpu = "xpu"
+
+
 class GPUSKUType(str, Enum):
     GB200SXM = "gb200_sxm"
     B200SXM = "b200_sxm"
@@ -77,10 +82,7 @@ class GPUSKUType(str, Enum):
 
 
 class XPUSKUType(str, Enum):
-    """Intel XPU SKU types. Enum values are AIC system identifiers directly."""
-
-    # Intel Arc discrete GPUs (only b60 is currently supported)
-    IntelArcProB60 = "b60"  # Intel Arc Pro B60 (Xe2 Battlemage, 0xe211)
+    IntelArcProB60 = "b60"
 
     @property
     def aic_system(self) -> str:
@@ -227,13 +229,17 @@ class FeaturesSpec(BaseModel):
 class HardwareSpec(BaseModel):
     """HardwareSpec describes the GPU hardware for profiling and deployment. All fields are auto-detected from cluster GPU nodes when omitted (requires cluster-wide mode with GPU discovery enabled). gpuSku is a selector (restricts which nodes are considered); the other fields are pure overrides passed to the profiler. If all four fields are set, discovery is skipped."""
 
-    deviceType: Optional[str] = Field(
+    deviceType: DeviceType = Field(
         default="cuda",
         description="DeviceType is the accelerator device category. Supported values: 'cuda' (NVIDIA GPU), 'xpu' (Intel XPU). Defaults to 'cuda'.",
     )
     gpuSku: Optional[Union[GPUSKUType, XPUSKUType]] = Field(
         default=None,
-        description="SKU of the accelerator. Use GPUSKUType for NVIDIA GPUs and XPUSKUType for Intel XPU. When omitted, auto-detected by selecting the GPU with the highest node count, then highest VRAM. In mixed-GPU clusters, set this to choose which GPU type to use. Discovery and totalGpus are then restricted to nodes matching this SKU.",
+        description="GPUSKU is the AIC hardware system identifier for the GPU. When omitted, the operator auto-detects this via InferHardwareSystem from cluster GPU node labels.",
+    )
+    xpuSku: Optional[XPUSKUType] = Field(
+        default=None,
+        description="XPU SKU is the AIC hardware system identifier for the Intel XPU. When omitted, the operator auto-detects this via cluster XPU node labels.",
     )
     vramMb: Optional[float] = Field(
         default=None,
@@ -268,8 +274,8 @@ class HardwareSpec(BaseModel):
         if isinstance(self.gpuSku, XPUSKUType):
             if "deviceType" not in self.model_fields_set:
                 # Not explicitly provided — auto-derive from XPU SKU.
-                self.deviceType = "xpu"
-            elif self.deviceType != "xpu":
+                self.deviceType = DeviceType.Xpu
+            elif self.deviceType != DeviceType.Xpu:
                 raise ValueError(
                     f"gpuSku '{self.gpuSku}' is an Intel XPU accelerator but deviceType is "
                     f"'{self.deviceType}'. Set deviceType to 'xpu' or omit it to auto-derive."
