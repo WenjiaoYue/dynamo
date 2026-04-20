@@ -2149,7 +2149,6 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `deviceType` _[DeviceType](#devicetype)_ | DeviceType is the accelerator device category.<br />Supported values: 'cuda' (NVIDIA GPU), 'xpu' (Intel XPU). Defaults to 'cuda'. | cuda | Enum: [cuda xpu] <br />Optional: \{\} <br /> |
 | `gpuSku` _[GPUSKUType](#gpuskutype)_ | GPUSKU is the AIC hardware system identifier for the GPU.<br />When omitted, the operator auto-detects this via InferHardwareSystem from cluster GPU node labels. |  | Enum: [gb200_sxm h200_sxm h100_sxm b200_sxm a100_sxm l40s] <br />Optional: \{\} <br /> |
-| `xpuSku` _[XPUSKUType](#xpuskutype)_ | XPU SKU is the AIC hardware system identifier for the Intel XPU.<br />When omitted, the operator auto-detects this via cluster XPU node labels. |  | Enum: [b60] <br />Optional: \{\} <br /> |
 | `vramMb` _float_ | VRAMMB is the VRAM per GPU in MiB. |  | Optional: \{\} <br /> |
 | `totalGpus` _integer_ | TotalGPUs is the total number of GPUs available in the cluster. |  | Optional: \{\} <br /> |
 | `numGpusPerNode` _integer_ | NumGPUsPerNode is the number of GPUs per node. |  | Optional: \{\} <br /> |

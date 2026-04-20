@@ -15,6 +15,7 @@
 
 """THOROUGH search strategy: enumerate candidates, deploy, benchmark, pick."""
 
+import copy
 import logging
 import os
 
@@ -85,7 +86,7 @@ async def _benchmark_prefill_candidates(
         os.makedirs(work_dir, exist_ok=True)
 
         config_fn = f"{work_dir}/config.yaml"
-        dgd = candidate.dgd_config
+        dgd = copy.deepcopy(candidate.dgd_config)
         xpu_rct = (
             dgd.pop("_xpu_resource_claim_template", None)
             if isinstance(dgd, dict)
@@ -207,7 +208,7 @@ async def _benchmark_decode_candidates(
         os.makedirs(work_dir, exist_ok=True)
 
         config_fn = f"{work_dir}/config.yaml"
-        dgd = candidate.dgd_config
+        dgd = copy.deepcopy(candidate.dgd_config)
         xpu_rct = (
             dgd.pop("_xpu_resource_claim_template", None)
             if isinstance(dgd, dict)

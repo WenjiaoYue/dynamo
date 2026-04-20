@@ -91,6 +91,8 @@ def _extract_profiler_params(dgdr: DynamoGraphDeploymentRequestSpec) -> tuple:
     """Pull all profiler parameters from dgdr and log them."""
     model = dgdr.model
     backend = BackendType(dgdr.backend).value.lower()
+    # Map gpuSku → AIC system identifier.  This is NOT device_type derivation;
+    # device_type is set once in __main__.py and passed via ops.device_type.
     sku = dgdr.hardware.gpuSku
     if isinstance(sku, XPUSKUType):
         system = sku.aic_system
@@ -389,14 +391,6 @@ async def run_profile(
             search_strategy,
             picking_mode,
         ) = _extract_profiler_params(dgdr)
-
-        # Propagate device_type from DGDR spec into ops so downstream consumers
-        # (webui labels, config modifiers) can detect the device family.
-        ops.device_type = (
-            dgdr.hardware.deviceType
-            if dgdr.hardware and dgdr.hardware.deviceType
-            else DeviceType.Cuda
-        )
 
         if backend == "auto":
             aic_supported = _check_auto_backend_support(model, system)

@@ -89,6 +89,8 @@ class VllmV1ConfigModifier(BaseConfigModifier):
 
         cfg = Config.model_validate(config)
         worker_names: list[str] = []
+        gpu_count_per_worker = 1  # fallback; see resolution order below
+        gpu_count_parsed = False
         for name, service in cfg.spec.services.items():
             if name in cls._NON_WORKER_SERVICES:
                 continue
@@ -106,15 +108,48 @@ class VllmV1ConfigModifier(BaseConfigModifier):
                 env.append({"name": "VLLM_TARGET_DEVICE", "value": "xpu"})
             container.model_extra["env"] = env
 
-            # 2. Remove NVIDIA-style gpu resource requests/limits (incompatible with DRA)
+            # 2. Remove NVIDIA-style gpu resource requests/limits (incompatible
+            #    with DRA).  Capture the GPU count first so we can use it in the
+            #    ResourceClaimTemplate.
+            #
+            #    Resolution order for gpu_count_per_worker:
+            #      a) resources.limits["gpu"] or resources.requests["gpu"]
+            #      b) --tensor-parallel-size from worker args (TP size == GPUs per worker)
+            #      c) fallback to 1 (single device)
             if service.resources:
                 for bucket in ("requests", "limits"):
                     res_dict = getattr(service.resources, bucket, None) or {}
                     if isinstance(res_dict, dict):
-                        res_dict.pop("gpu", None)
+                        gpu_val = res_dict.pop("gpu", None)
+                        if gpu_val is not None:
+                            try:
+                                gpu_count_per_worker = int(gpu_val)
+                                gpu_count_parsed = True
+                            except (ValueError, TypeError):
+                                pass
                         setattr(service.resources, bucket, res_dict or None)
 
+            # If gpu count was not in resources, infer from --tensor-parallel-size
+            if not gpu_count_parsed and container.args:
+                args = list(container.args)
+                for i, arg in enumerate(args):
+                    if arg in ("--tensor-parallel-size", "--tp") and i + 1 < len(args):
+                        try:
+                            gpu_count_per_worker = int(args[i + 1])
+                            gpu_count_parsed = True
+                        except (ValueError, TypeError):
+                            pass
+                        break
+
             worker_names.append(name)
+
+        if not gpu_count_parsed and worker_names:
+            logger.warning(
+                "No gpu resource count found in worker config (resources or "
+                "--tensor-parallel-size); defaulting to %d GPU(s) per worker "
+                "for ResourceClaimTemplate.",
+                gpu_count_per_worker,
+            )
 
         # 3. Add a single shared ResourceClaimTemplate for Intel DRA and wire
         #    each worker pod to use it.  Derive template name from the DGD
@@ -167,7 +202,7 @@ class VllmV1ConfigModifier(BaseConfigModifier):
                                 "name": "gpu",
                                 "exactly": {
                                     "deviceClassName": "gpu.intel.com",
-                                    "count": 1,
+                                    "count": gpu_count_per_worker,
                                 },
                             }
                         ]
